@@ -1,0 +1,2 @@
+Our system does not support fcntl to turn on O_SYNC.
+This flag can only be added when open().

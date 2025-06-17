@@ -1,0 +1,6 @@
+3 time:
+ls -al  -- display last modification time
+ls -cal -- display last status modification time
+ls -ual -- display last access time
+
+This program keeps 'ls -al' and 'ls -ual' output, but not 'ls -cal'

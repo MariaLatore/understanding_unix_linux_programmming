@@ -1,0 +1,5 @@
+int getopt(int argc, char *argv[], char *optstr)
+
+NOTE:
+call of getopt will change the sequence of the array argv[]. 
+see /home/zxy/test/getopt/main.c for a demonstration test. 

@@ -1,0 +1,46 @@
+[?1049h[?1h=[1;41r[?12;25h[?12l[?25h[27m[m[H[2J[?25l[41;1H"/etc/passwd.edit" 60L, 3259C[1;1Hroot:x:0:0:root:/root:/bin/bash
+bin:x:1:1:bin:/bin:/sbin/nologin
+daemon:x:2:2:daemon:/sbin:/sbin/nologin
+adm:x:3:4:adm:/var/adm:/sbin/nologin
+lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin
+sync:x:5:0:sync:/sbin:/bin/sync
+shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown
+halt:x:7:0:halt:/sbin:/sbin/halt
+mail:x:8:12:mail:/var/spool/mail:/sbin/nologin
+operator:x:11:0:operator:/root:/sbin/nologin
+games:x:12:100:games:/usr/games:/sbin/nologin
+ftp:x:14:50:FTP User:/var/ftp:/sbin/nologin
+nobody:x:99:99:Nobody:/:/sbin/nologin
+ods:x:999:999:softhsm private keys owner:/var/lib/softhsm:/sbin/nologin
+pegasus:x:66:65:tog-pegasus OpenPegasus WBEM/CIM services:/var/lib/Pegasus:/sbin/nologin
+systemd-network:x:192:192:systemd Network Management:/:/sbin/nologin
+dbus:x:81:81:System message bus:/:/sbin/nologin
+polkitd:x:998:997:User for polkitd:/:/sbin/nologin
+apache:x:48:48:Apache:/usr/share/httpd:/sbin/nologin
+colord:x:997:994:User for colord:/var/lib/colord:/sbin/nologin
+unbound:x:996:993:Unbound DNS resolver:/etc/unbound:/sbin/nologin
+libstoragemgmt:x:995:992:daemon account for libstoragemgmt:/var/run/lsm:/sbin/nologin
+saslauth:x:994:76:Saslauthd user:/run/saslauthd:/sbin/nologin
+hsqldb:x:96:96::/var/lib/hsqldb:/sbin/nologin
+rpc:x:32:32:Rpcbind Daemon:/var/lib/rpcbind:/sbin/nologin
+saned:x:993:991:SANE scanner daemon user:/usr/share/sane:/sbin/nologin
+gluster:x:992:990:GlusterFS daemons:/run/gluster:/sbin/nologin
+tomcat:x:53:53:Apache Tomcat:/usr/share/tomcat:/sbin/nologin
+named:x:25:25:Named:/var/named:/sbin/nologin
+abrt:x:173:173::/etc/abrt:/sbin/nologin
+postfix:x:89:89::/var/spool/postfix:/sbin/nologin
+setroubleshoot:x:991:988::/var/lib/setroubleshoot:/sbin/nologin
+rtkit:x:172:172:RealtimeKit:/proc:/sbin/nologin
+pulse:x:171:171:PulseAudio System Daemon:/var/run/pulse:/sbin/nologin
+radvd:x:75:75:radvd user:/:/sbin/nologin
+chrony:x:990:985::/var/lib/chrony:/sbin/nologin
+qemu:x:107:107:qemu user:/:/sbin/nologin
+pkiuser:x:17:17:Certificate System:/usr/share/pki:/sbin/nologin
+ntp:x:38:38::/etc/ntp:/sbin/nologin
+tss:x:59:59:Account used by the trousers package to sandbox the tcsd daemon:/dev/null:/sbin/nologin[1;1H[?12l[?25h[?25l[41;1H[K[41;1H:q[?12l[?25h![?25l[41;3H[K[41;3H[?12l[?25h[?25l[41;2H[K[41;2H[?12l[?25h [1;1H[?25l[41;1H:.,.+1![?12l[?25h[?25l[1;1H[?12l[?25h
+
+[?25l[41;1HType  :quit<Enter>  to exit Vim[3;1H[?12l[?25h[?25l[?12l[?25h
+[?25l[?12l[?25h
+[?25l[?12l[?25h[?25l[?12l[?25h[41;1H[?1l>[?1049lVim: Error reading input, exiting...
+Vim: Finished.
+[41;1H

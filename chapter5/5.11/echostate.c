@@ -1,0 +1,27 @@
+/* echostate.c
+ *   reports current state of echo bit in tty driver for fd 0
+ *   shows how to read attributes from driver and test a bit
+ */
+#include <stdio.h>
+#include <termios.h>
+#include <stdlib.h>
+
+int fd = 1;
+
+int
+main ()
+{
+  struct termios info;
+  int rv;
+  rv = tcgetattr (fd, &info);	// read values from driver
+  if (-1 == rv)
+    {
+      perror ("tcgetattr");
+      exit (1);
+    }
+  if (info.c_lflag & ECHO)
+    printf ("echo is on, since its bit is 1\n");
+  else
+    printf ("echo is OFF, since its bit is 0\n");
+  return 0;
+}
