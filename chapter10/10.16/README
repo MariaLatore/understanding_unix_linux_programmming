@@ -1,0 +1,10 @@
+method to test the program:
+./a.out 0
+
+exec 7<cal.txt 
+./a,out 7
+exec 7<&-
+
+exec 27>cal.txt
+./a.out 27
+exec 27<&-

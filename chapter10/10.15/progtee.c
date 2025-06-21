@@ -1,6 +1,7 @@
 #include<stdio.h>
 #include<unistd.h>
 #include<stdlib.h>
+#include<sys/wait.h>
 
 #define MAX_PROG_ARGNUM 10
 
@@ -35,7 +36,7 @@ main (int argc, char *argv[])
       exit (1);
     }
 
-  if (0 < pid)
+  if (0 == pid)
     {
       if (-1 == (dup2 (pipefd[0], 0)))
 	{
@@ -58,5 +59,6 @@ main (int argc, char *argv[])
       write (pipefd[1], &c, sizeof (c));
     }
   close (pipefd[1]);
+  wait (NULL);
   return 0;
 }
