@@ -1,0 +1,100 @@
+/* socklib.c
+ *
+ *   This file contains functions uses lots when writing internet
+ *   client/server programs. The 2 main functions here are:
+ *
+ *   int make_server_socket( portnum )  returns a server socket or -1 if error
+ *   int make_server_socket_q(portnum, backlog)
+ *   int connect_to_server(char *hostname, int portnum)  returns a connected socket or -1 if error
+ *
+ */
+
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <time.h>
+#include <strings.h>
+
+#define HOSTLEN 256
+#define BACKLOG 1
+int
+make_server_socket_q (int portnum, int backlog)
+{
+  struct sockaddr_in saddr;	//build our address here
+  struct hostent *hp;		//this is part of our address
+  char hostname[HOSTLEN];
+  int sock_id;			//the socket
+  socklen_t optlen;
+  int option;
+
+  sock_id = socket (PF_INET, SOCK_STREAM, 0);	//get a socket
+  if (sock_id == -1)
+    {
+      perror ("server socket");
+      return -1;
+    }
+
+  optlen = sizeof (option);
+  option = 1;
+  setsockopt (sock_id, SOL_SOCKET, SO_REUSEADDR, (void *) &option, optlen);
+
+
+
+//build address and build it to socket
+  bzero ((void *) &saddr, sizeof (saddr));	//clear out struct
+  gethostname (hostname, HOSTLEN);	//where am I
+  hp = gethostbyname (hostname);	//get info about host fill in host part
+
+  bcopy ((void *) hp->h_addr, (void *) &saddr.sin_addr, hp->h_length);
+  saddr.sin_port = htons (portnum);	//fill in socket port
+  saddr.sin_family = AF_INET;	//fill in addr family
+  if (bind (sock_id, (struct sockaddr *) &saddr, sizeof (saddr)) != 0)
+    {
+      perror ("bind error");
+      return -1;
+    }
+
+//arrange for incoming calls
+  if (listen (sock_id, backlog) != 0)
+    {
+      perror ("listen error");
+      return -1;
+    }
+  return sock_id;
+}
+
+int
+make_server_socket (int portnum)
+{
+  return make_server_socket_q (portnum, BACKLOG);
+}
+
+int
+connect_to_server (char *host, int portnum)
+{
+  int sock;
+  struct sockaddr_in servaddr;	//the number to call
+  struct hostent *hp;		//used to get number
+
+//Step1: Get a socket
+  sock = socket (AF_INET, SOCK_STREAM, 0);	//get a line
+  if (sock == -1)
+    return -1;
+
+//Step2: connect to server
+  bzero (&servaddr, sizeof (servaddr));	//zeor the address
+  hp = gethostbyname (host);	//lookup host's ip #
+  if (hp == NULL)
+    return -1;
+
+  bcopy (hp->h_addr, (struct sockaddr *) &servaddr.sin_addr, hp->h_length);
+  servaddr.sin_port = htons (portnum);	//fill in port number
+  servaddr.sin_family = AF_INET;	//fill in socket type
+  if (connect (sock, (struct sockaddr *) &servaddr, sizeof (servaddr)) != 0)
+    return -1;
+
+  return sock;
+}
