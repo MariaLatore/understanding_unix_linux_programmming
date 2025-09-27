@@ -1,0 +1,184 @@
+/* tanimate.c: animate several strings using threads, curses, usleep()
+ *
+ * bigidea: one thread for each animated string
+ *          one thread for keyboard control
+ *          shared variables for communication
+ * compile: cc tanimate.c -lcurses -lpthread -o tanimate
+ *   to do: needs locks for shared variables
+ *          nice to put screen handling in its own thread
+ */
+
+/* Msg horizontally moved is acturally a string of format
+ *               ' ' + <msg string> + ' '
+ * the leading and tailing ' ' will erase the trace of the message
+ * when moving right and left seperately!!!
+ *
+ * The same, msg vertically moved is actually a string of format
+ *                   ' '
+ *                    +
+ *                    <
+ *                    m
+ *                    s
+ *                    g
+ *
+ *                    s
+ *                    t
+ *                    r
+ *                    i
+ *                    n
+ *                    g
+ *                    >
+ *                    +
+ *                   ' '
+ * The leading and tailing ' ' will erase the trace of the message
+ * when moving down and up seperately!!!
+ */
+
+#include <curses.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define MAXMSG 10   // limit to number of strings
+#define TUNIT 20000 // timeunits in microseconds
+#define HORIZON 0
+#define VERTICAL 1
+struct propset {
+  char *str; // the message
+  int row;   // the row
+  int col;
+  int delay; // delay in time units
+  int dir;   //+1 or -1
+  int orientation;
+};
+int setup(int nstrings, char *strings[], struct propset props[]);
+void *animate(void *arg);
+
+pthread_mutex_t mx = PTHREAD_MUTEX_INITIALIZER;
+
+int main(int ac, char *av[]) {
+  int c;                        // user input
+  pthread_t thrds[MAXMSG];      // the threads
+  struct propset props[MAXMSG]; // properties of string
+  void *animate();              // the function
+  int num_msg;                  // number of strings
+  int i;
+
+  if (ac == 1) {
+    printf("usage: %s string ..\n", av[0]);
+    exit(1);
+  }
+  num_msg = setup(ac - 1, av + 1, props);
+  /* create all the threads */
+  for (i = 0; i < num_msg; i++)
+    if (pthread_create(&thrds[i], NULL, animate, &props[i])) {
+      fprintf(stderr, "error creating thread");
+      endwin();
+      exit(0);
+    }
+  /* process user input */
+  while (1) {
+    c = getch();
+    if (c == 'Q')
+      break;
+    if (c == ' ')
+      for (i = 0; i < num_msg; i++)
+        props[i].dir = -props[i].dir;
+    if (c >= '0' && c <= '9') {
+      i = c - '0';
+      if (i < num_msg)
+        props[i].dir = -props[i].dir;
+    }
+  }
+
+  /* cancel all the threads */
+  pthread_mutex_lock(&mx);
+  for (i = 0; i < num_msg; i++)
+    pthread_cancel(thrds[i]);
+  endwin();
+  return 0;
+}
+
+int setup(int nstrings, char *strings[], struct propset props[]) {
+  int num_msg = (nstrings > MAXMSG ? MAXMSG : nstrings);
+  int i;
+
+  /* assign rows and velocities to each string */
+  srand(getpid());
+  for (i = 0; i < num_msg; i++) {
+    props[i].str = strings[i];              // the message
+    props[i].row = i;                       // the row
+    props[i].col = i;                       // the col
+    props[i].delay = 1 + (rand() % 15);     // a speed
+    props[i].dir = ((rand() % 2) ? 1 : -1); //+1 or -1
+    props[i].orientation = ((rand() % 2) ? HORIZON : VERTICAL);
+  }
+
+  /* set up curses */
+  initscr();
+  crmode();
+  noecho();
+  clear();
+  mvprintw(LINES - 1, 0, "'Q' to quit, '0'..%d' to bounc", num_msg - 1);
+  return num_msg;
+}
+
+void display(struct propset *info) {
+  int len = strlen(info->str);
+  int i;
+
+  if (info->orientation != VERTICAL) {
+    pthread_mutex_lock(&mx);            // only one thread
+    mvaddch(info->row, info->col, ' '); // can call curses at the same tiem
+    addstr(info->str);                  // Since I doubt it si
+    addch(' ');                         // reentrant
+    move(LINES - 1, COLS - 1);          // park cursor
+    refresh();                          // and show it
+    pthread_mutex_unlock(&mx);          // done with curses
+    /* move item to next column and check for bouncing */
+    info->col += info->dir;
+    if (info->col <= 0 && info->dir == -1)
+      info->dir = 1;
+    else if (info->col + len + 1 >= COLS && info->dir == 1)
+      info->dir = -1;
+
+    return;
+  }
+
+  // only one thread can call cureses at the same time
+  // since I doubt is is reentrant
+  pthread_mutex_lock(&mx);
+  mvaddch(info->row, info->col, ' ');
+  for (i = 0; i < len; i++)
+    mvaddch(info->row + i + 1, info->col, info->str[i]);
+  mvaddch(info->row + i + 1, info->col, ' ');
+  move(LINES - 1, COLS - 1); // park cursor
+  refresh();                 // and show it
+  pthread_mutex_unlock(&mx); // done with curses
+
+  /* move item to next column and check for bouncing */
+  info->row += info->dir;
+  if (info->row <= 0 && info->dir == -1)
+    info->dir = 1;
+  else if (info->row + len + 1 >= LINES && info->dir == 1)
+    info->dir = -1;
+
+  return;
+}
+
+/* the code that runs in each thread */
+void *animate(void *arg) {
+  struct propset *info = arg;      // pint to info block
+  int len = strlen(info->str) + 2; //+2 for padding
+  if (info->orientation != VERTICAL)
+    info->col = rand() % (COLS - len - 3); // space for padding
+  else
+    info->row = rand() % (LINES - len - 3);
+
+  while (1) {
+    usleep(info->delay * TUNIT);
+    display(info);
+  }
+}

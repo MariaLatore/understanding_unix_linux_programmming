@@ -1,0 +1,9 @@
+Please use rls's client app(chapter11) to test this server. Examples:
+./rls 127.0.0.1 youngzxy
+./rls 127.0.0.1 STATUS
+kill -1 <pid of server> (-1 means SIGHUP)
+
+
+bash cmd to add new user to database:
+sudo useradd -M -N youngzxy
+sudo userdel -f youngzxy

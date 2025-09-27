@@ -1,0 +1,6 @@
+usage:
+./a.out 2025
+
+curl http://127.0.0.1:2025/status
+curl http://127.0.0.1:2025/socklib.h
+curl http://127.0.0.1:2025

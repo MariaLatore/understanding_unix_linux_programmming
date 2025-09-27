@@ -1,0 +1,144 @@
+########################################################################################
+process
+#######################################################################################
+[zxy@localhost 14.8]$ time ./a/v2_cout/a.out /etc/group
+file /etc/group: 278
+the total words: 278
+
+real	0m0.003s
+user	0m0.000s
+sys	0m0.002s
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ time ./a/v2_cout/a.out /etc/group /usr/share/dict/words 
+file /etc/group: 278
+file /usr/share/dict/words: 526101
+the total words: 526379
+
+real	0m0.075s
+user	0m0.040s
+sys	0m0.003s
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ time ./a/v2_cout/a.out /etc/group /usr/share/dict/words /etc/passwd
+file /etc/group: 278
+file /usr/share/dict/words: 526101
+file /etc/passwd: 608
+the total words: 526987
+
+real	0m0.058s
+user	0m0.040s
+sys	0m0.004s
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ time ./a/v2_cout/a.out /etc/group /usr/share/dict/words /etc/passwd /usr/share/dict/linux.words 
+file /etc/group: 278
+file /usr/share/dict/words: 526101
+file /etc/passwd: 608
+file /usr/share/dict/linux.words: 526101
+the total words: 1053088
+
+real	0m0.116s
+user	0m0.081s
+sys	0m0.004s
+[zxy@localhost 14.8]$ 
+
+
+#############################################################
+single thread
+#############################################################
+
+[zxy@localhost 14.8]$ time ./b/a.out /etc/group
+file /etc/group: 278
+total words: 278
+
+real	0m0.002s
+user	0m0.001s
+sys	0m0.000s
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ time ./b/a.out /etc/group /usr/share/dict/words 
+file /etc/group: 278
+file /usr/share/dict/words: 526101
+total words: 526379
+
+real	0m0.055s
+user	0m0.042s
+sys	0m0.000s
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ time ./b/a.out /etc/group /usr/share/dict/words /etc/passwd
+file /etc/group: 278
+file /usr/share/dict/words: 526101
+file /etc/passwd: 608
+total words: 526987
+
+real	0m0.051s
+user	0m0.041s
+sys	0m0.000s
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ time ./b/a.out /etc/group /usr/share/dict/words /etc/passwd /usr/share/dict/linux.words 
+file /etc/group: 278
+file /usr/share/dict/words: 526101
+file /etc/passwd: 608
+file /usr/share/dict/linux.words: 526101
+total words: 1053088
+
+real	0m0.113s
+user	0m0.081s
+sys	0m0.000s
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ 
+
+
+#####################################################################
+threads
+#####################################################################
+
+calhost 14.8]$ time ../14.7/rd3/a.out /etc/group
+  278: /etc/group
+  278: total words
+
+real	0m0.005s
+user	0m0.000s
+sys	0m0.002s
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ time ../14.7/rd3/a.out /etc/group /usr/share/dict/words
+  278: /etc/group
+526101: /usr/share/dict/words
+526379: total words
+
+real	0m0.116s
+user	0m0.084s
+sys	0m0.000s
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ time ../14.7/rd3/a.out /etc/group /usr/share/dict/words /etc/passwd
+  278: /etc/group
+526101: /usr/share/dict/words
+  608: /etc/passwd
+526987: total words
+
+real	0m0.118s
+user	0m0.081s
+sys	0m0.003s
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ time ../14.7/rd3/a.out /etc/group /usr/share/dict/words /etc/passwd /usr/share/dict/linux.words 
+  278: /etc/group
+526101: /usr/share/dict/words
+  608: /etc/passwd
+526101: /usr/share/dict/linux.words
+1053088: total words
+
+real	0m0.197s
+user	0m0.158s
+sys	0m0.007s
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ 
+[zxy@localhost 14.8]$ 
+
