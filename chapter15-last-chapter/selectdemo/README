@@ -1,0 +1,2 @@
+usage:
+  sudo ./a.out /dev/tty /dev/input/mice 4
