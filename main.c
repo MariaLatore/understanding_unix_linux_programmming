@@ -1,120 +1,181 @@
-#include <stdio.h>
-#include <unistd.h>
 #include <curses.h>
+#include <fcntl.h>
+#include <linux/input.h>
 #include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/epoll.h>
 #include <sys/time.h>
+#include <time.h>
+#include <unistd.h>
 
 #define DFL_SYMBOL 'o'
-#define BLANK  ' '
+#define BLANK ' '
+
+#define EPOLL_NUM 1
+#define EPOLL_WAIT_MS 16
+#define MOVE_INTERVAL_MS 50
+
+#ifndef EVENTDEV
+#define EVENTDEV "/dev/input/event0"
+#endif
 
 typedef struct {
-	int x_pos;
-	int y_pos;
-	char symbol;
-}ppball_t;
+  int x_pos;
+  int y_pos;
+  char symbol;
+} ppball_t;
 
 ppball_t ball = {0};
 int done = 0;
-int tick = 0;
 
-void move_ball(int newxdir, int newydir){
-	mvaddch(ball.y_pos, ball.x_pos, BLANK);
-	int maxline = LINES;
-	int maxcol = COLS;
-	if(ball.x_pos + newxdir < 0) ball.x_pos = maxcol-1;
-	else if(ball.x_pos + newxdir >= maxcol) ball.x_pos = 0;
-	else ball.x_pos += newxdir;
+static int up_pressed = 0, down_pressed = 0, right_pressed = 0,
+           left_pressed = 0;
 
-	if(ball.y_pos + newydir < 0) ball.y_pos = maxline-1;
-	else if(ball.y_pos + newydir >= maxline) ball.y_pos = 0;
-	else ball.y_pos += newydir;
-	mvaddch(ball.y_pos, ball.x_pos, ball.symbol);
-	refresh();
+static long now_ms(void) {
+  struct timespec ts;
+
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (ts.tv_sec * 1000L) + (ts.tv_nsec / 1000000L);
 }
 
-void on_tick(int sig){
-	tick = 1;
-}
-	
+void move_ball(int newxdir, int newydir) {
+  mvaddch(ball.y_pos, ball.x_pos, BLANK);
+  int maxline = LINES;
+  int maxcol = COLS;
+  if (ball.x_pos + newxdir < 0)
+    ball.x_pos = maxcol - 1;
+  else if (ball.x_pos + newxdir >= maxcol)
+    ball.x_pos = 0;
+  else
+    ball.x_pos += newxdir;
 
-void on_input(){
-	int c=ERR,now;
-	while((now = getch())!=ERR){
-		c = now;
-	}
-	switch(c){
-			case 'q':
-				done=1;break;
-			case 'w':
-				move_ball(0,-1);break;
-			case 's':
-				move_ball(0,1); break;
-			case 'a':
-				move_ball(-1,0); break;
-			case 'd':
-				move_ball(1,0); break;
-			default:
-				break;
-	}
-	return ;
-
+  if (ball.y_pos + newydir < 0)
+    ball.y_pos = maxline - 1;
+  else if (ball.y_pos + newydir >= maxline)
+    ball.y_pos = 0;
+  else
+    ball.y_pos += newydir;
+  mvaddch(ball.y_pos, ball.x_pos, ball.symbol);
+  refresh();
 }
 
-int setup_ticker(int n_msecs){
-	struct itimerval new_timeset;
-	long n_sec, n_usecs;
+void handle_key_event(struct epoll_event *pevent) {
+  struct input_event ev;
+  ssize_t n;
 
-	n_sec = n_msecs/1000;
-	n_usecs = (n_msecs%1000)*1000;
-
-	new_timeset.it_interval.tv_sec = n_sec;
-	new_timeset.it_interval.tv_usec = n_usecs;
-	new_timeset.it_value.tv_sec = n_sec;
-	new_timeset.it_value.tv_usec = n_usecs;
-	return setitimer(ITIMER_REAL, &new_timeset, NULL);
+  while ((n = read(pevent->data.fd, &ev, sizeof(ev))) == sizeof(ev)) {
+    if (ev.type != EV_KEY)
+      continue;
+    switch (ev.code) {
+    case KEY_Q:
+      done = (ev.value == 1);
+      break;
+    case KEY_W:
+      up_pressed = (ev.value != 0);
+      break;
+    case KEY_S:
+      down_pressed = (ev.value != 0);
+      break;
+    case KEY_A:
+      left_pressed = (ev.value != 0);
+      break;
+    case KEY_D:
+      right_pressed = (ev.value != 0);
+      break;
+    default:
+      break;
+    }
+  }
+  return;
 }
 
-void init(void){
-	//init curse
-	initscr();
-	cbreak();
-	noecho();
-	clear();
-	refresh();
-        curs_set(0);  //do not display cursor 
-	nodelay(stdscr, TRUE);  //getch unblock
-	
-	//signal init
-	signal(SIGINT, SIG_IGN);
-	signal(SIGALRM, on_tick);
+void update_motion(void) {
+  int dx = 0, dy = 0;
+  if (left_pressed && !right_pressed)
+    dx = -1;
+  else if (!left_pressed && right_pressed)
+    dx = 1;
 
-	//ball pos init
-	ball.symbol = DFL_SYMBOL;
-	ball.x_pos = COLS/2;
-	ball.y_pos = LINES/2;
-	
-	move_ball(0,0);
+  if (up_pressed && !down_pressed)
+    dy = -1;
+  else if (!up_pressed && down_pressed)
+    dy = 1;
 
-	//init ticker
-	setup_ticker(10);
+  if (dx != 0 || dy != 0)
+    move_ball(dx, dy);
 }
 
-int main(){
-	sigset_t block_sigs;
-	sigset_t old_sigs;
-	sigemptyset(&block_sigs);
-	sigaddset(&block_sigs, SIGALRM);
-	init();
-	while(done == 0){
-		if(tick == 1){
-			sigprocmask(SIG_BLOCK, &block_sigs, &old_sigs);
-			tick=0;
-			on_input();
-			sigprocmask(SIG_SETMASK, &old_sigs, NULL);
-		}
-	}
-	
-	endwin();
-	return 0;
+void init(void) {
+  // init curse
+  initscr();
+  cbreak();
+  noecho();
+  clear();
+  refresh();
+  curs_set(0);            // do not display cursor
+  leaveok(stdscr, TRUE);  // avoid cursor movement artifacts
+  nodelay(stdscr, TRUE);  // getch unblock
 
+  // signal init
+  signal(SIGINT, SIG_IGN);
+
+  // ball pos init
+  ball.symbol = DFL_SYMBOL;
+  ball.x_pos = COLS / 2;
+  ball.y_pos = LINES / 2;
+
+  move_ball(0, 0);
+}
+
+int main() {
+  int epfd;
+  int devfd;
+  struct epoll_event events;
+  struct epoll_event *monitor_events;
+  int evtcnt;
+  int ret = 0;
+  long last_move_ms;
+
+  devfd = open(EVENTDEV, O_RDONLY|O_NONBLOCK);
+  epfd = epoll_create(EPOLL_NUM);
+
+  if (devfd == -1 || epfd == -1) {
+    perror("open fd error");
+    return -1;
+  }
+
+  monitor_events = (struct epoll_event *)malloc(sizeof(*monitor_events));
+  if (NULL == monitor_events) {
+    perror("malloc error");
+    return -1;
+  }
+
+  events.events = EPOLLIN;
+  events.data.fd = devfd;
+  epoll_ctl(epfd, EPOLL_CTL_ADD, devfd, &events);
+
+  init();
+  last_move_ms = now_ms();
+  while (done == 0) {
+    evtcnt = epoll_wait(epfd, monitor_events, EPOLL_NUM, EPOLL_WAIT_MS);
+    if (evtcnt == 1) {
+      handle_key_event(monitor_events);
+    } else if (evtcnt == -1) {
+      perror("epoll_wait error");
+      ret = -1;
+      break;
+    }
+
+    if (now_ms() - last_move_ms >= MOVE_INTERVAL_MS) {
+      update_motion();
+      last_move_ms = now_ms();
+    }
+  }
+
+  flushinp();
+  endwin();
+  close(epfd);
+  close(devfd);
+  return ret;
 }
