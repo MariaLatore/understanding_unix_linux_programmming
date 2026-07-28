@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <sys/epoll.h>
 #include <sys/time.h>
-#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -117,7 +116,6 @@ void init(void) {
   cbreak();
   noecho();
   clear();
-  refresh();
   curs_set(0);            // do not display cursor
   leaveok(stdscr, TRUE);  // avoid cursor movement artifacts
   nodelay(stdscr, TRUE);  // getch unblock
@@ -178,8 +176,6 @@ int main() {
     }
   }
 
-  flushinp();
-  tcflush(STDIN_FILENO, TCIFLUSH);
   endwin();
   close(epfd);
   close(devfd);
