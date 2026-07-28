@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <sys/epoll.h>
 #include <sys/time.h>
+#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -28,6 +29,7 @@ typedef struct {
 
 ppball_t ball = {0};
 int done = 0;
+int quit_requested = 0;
 
 static int up_pressed = 0, down_pressed = 0, right_pressed = 0,
            left_pressed = 0;
@@ -69,7 +71,10 @@ void handle_key_event(struct epoll_event *pevent) {
       continue;
     switch (ev.code) {
     case KEY_Q:
-      done = (ev.value == 1);
+      if (ev.value == 1)
+        quit_requested = 1;
+      else if (ev.value == 0 && quit_requested)
+        done = 1;
       break;
     case KEY_W:
       up_pressed = (ev.value != 0);
@@ -174,6 +179,7 @@ int main() {
   }
 
   flushinp();
+  tcflush(STDIN_FILENO, TCIFLUSH);
   endwin();
   close(epfd);
   close(devfd);
