@@ -1,19 +1,20 @@
 #include <curses.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <linux/input.h>
 #include <signal.h>
 #include <stdio.h>
-#include <errno.h>
 #include <stdlib.h>
 #include <sys/epoll.h>
 #include <sys/time.h>
+#include <sys/timerfd.h>
 #include <time.h>
 #include <unistd.h>
 
 #define DFL_SYMBOL 'o'
 #define BLANK ' '
 
-#define EPOLL_NUM 1
+#define EPOLL_NUM 2
 #define EPOLL_WAIT_MS 16
 #define MOVE_INTERVAL_MS 50
 
@@ -30,7 +31,6 @@ typedef struct {
 ppball_t ball = {0};
 int done = 0;
 int quit_requested = 0;
-volatile sig_atomic_t tick = 0;
 
 static int up_pressed = 0, down_pressed = 0, right_pressed = 0,
            left_pressed = 0;
@@ -105,22 +105,6 @@ void update_motion(void) {
     move_ball(dx, dy);
 }
 
-int setup_ticker(int n_msecs) {
-  struct itimerval new_timeset;
-  long n_sec, n_usecs;
-
-  n_sec = n_msecs / 1000;
-  n_usecs = (n_msecs % 1000) * 1000;
-
-  new_timeset.it_interval.tv_sec = n_sec;
-  new_timeset.it_interval.tv_usec = n_usecs;
-  new_timeset.it_value.tv_sec = n_sec;
-  new_timeset.it_value.tv_usec = n_usecs;
-  return setitimer(ITIMER_REAL, &new_timeset, NULL);
-}
-
-void on_tick(int sig) { tick = 1; }
-
 void init(void) {
   // init curse
   initscr();
@@ -131,47 +115,47 @@ void init(void) {
   leaveok(stdscr, TRUE); // avoid cursor movement artifacts
   nodelay(stdscr, TRUE); // getch unblock
 
-  // signal init
-  signal(SIGINT, SIG_IGN);
-  struct sigaction action = {0};
-  action.sa_handler = on_tick;
-  sigaction(SIGALRM, &action, NULL);
-
   // ball pos init
   ball.symbol = DFL_SYMBOL;
   ball.x_pos = COLS / 2;
   ball.y_pos = LINES / 2;
 
   move_ball(0, 0);
-  if (setup_ticker(MOVE_INTERVAL_MS)) {
-    perror("set ticker error");
-    exit(-1);
-  }
+}
+
+void setup_timer(struct itimerspec *ptsp, int ms) {
+  ptsp->it_value.tv_sec = (ms / 1000);
+  ptsp->it_value.tv_nsec = (ms % 1000) * 1000000;
+
+  ptsp->it_interval.tv_sec = (ms / 1000);
+  ptsp->it_interval.tv_nsec = (ms % 1000) * 1000000;
 }
 
 int main() {
   int epfd;
   int devfd;
+  int timerfd;
   struct epoll_event events;
-  struct epoll_event *monitor_events;
+  struct epoll_event monitor_events[EPOLL_NUM] = {0};
   int evtcnt;
+  struct itimerspec timerspec = {0};
   int ret = 0;
-  sigset_t block_sigs;
-  sigset_t old_sigs;
-  sigemptyset(&block_sigs);
-  sigaddset(&block_sigs, SIGALRM);
 
   devfd = open(EVENTDEV, O_RDONLY | O_NONBLOCK);
-  epfd = epoll_create(EPOLL_NUM);
-
-  if (devfd == -1 || epfd == -1) {
-    perror("open fd error");
+  if (devfd == -1) {
+    perror("devfd open error");
     return -1;
   }
 
-  monitor_events = (struct epoll_event *)malloc(sizeof(*monitor_events));
-  if (NULL == monitor_events) {
-    perror("malloc error");
+  timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
+  if (-1 == timerfd) {
+    perror("timefd create error");
+    return -1;
+  }
+
+  epfd = epoll_create(EPOLL_NUM);
+  if (epfd == -1) {
+    perror("ep fd open error");
     return -1;
   }
 
@@ -179,32 +163,48 @@ int main() {
   events.data.fd = devfd;
   epoll_ctl(epfd, EPOLL_CTL_ADD, devfd, &events);
 
+  events.events = EPOLLIN;
+  events.data.fd = timerfd;
+  epoll_ctl(epfd, EPOLL_CTL_ADD, timerfd, &events);
+
   init();
+  setup_timer(&timerspec, MOVE_INTERVAL_MS);
+  ret = timerfd_settime(timerfd, 0, &timerspec, NULL);
+  if (-1 == ret) {
+    perror("timer fd settime error");
+    return -1;
+  }
+
   while (done == 0) {
+    int update = 0;
     evtcnt = epoll_wait(epfd, monitor_events, EPOLL_NUM, -1);
-    if (evtcnt == 1) {
-      handle_key_event(monitor_events);
-    } else if (evtcnt == -1) {
+    if (evtcnt == -1) {
       if (errno != EINTR) {
         perror("epoll_wait error");
         ret = -1;
         break;
       }
     }
-
-    int ticktmp;
-    sigprocmask(SIG_BLOCK, &block_sigs, &old_sigs);
-    ticktmp = tick;
-    tick=0;
-    sigprocmask(SIG_SETMASK, &old_sigs, NULL);
-    if (ticktmp == 1) {
-      update_motion();
+    for (int i = 0; i < evtcnt; i++) {
+      if (monitor_events[i].data.fd == timerfd) {
+        uint64_t expiration;
+        unsigned int bytes = read(timerfd, &expiration, sizeof(expiration));
+        if (bytes == sizeof(expiration))
+          update = 1;
+        else if (bytes == -1 && errno != EINTR) {
+          ret = -1;
+          done = 1;
+        }
+      } else if (monitor_events[i].data.fd == devfd)
+        handle_key_event(&monitor_events[i]);
     }
- 
+    if (1 == update)
+      update_motion();
   }
 
   endwin();
   close(epfd);
   close(devfd);
+  close(timerfd);
   return ret;
 }
