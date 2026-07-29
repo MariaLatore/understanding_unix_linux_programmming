@@ -3,6 +3,7 @@
 #include <linux/input.h>
 #include <signal.h>
 #include <stdio.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <sys/epoll.h>
 #include <sys/time.h>
@@ -29,16 +30,10 @@ typedef struct {
 ppball_t ball = {0};
 int done = 0;
 int quit_requested = 0;
+volatile sig_atomic_t tick = 0;
 
 static int up_pressed = 0, down_pressed = 0, right_pressed = 0,
            left_pressed = 0;
-
-static long now_ms(void) {
-  struct timespec ts;
-
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  return (ts.tv_sec * 1000L) + (ts.tv_nsec / 1000000L);
-}
 
 void move_ball(int newxdir, int newydir) {
   mvaddch(ball.y_pos, ball.x_pos, BLANK);
@@ -110,18 +105,37 @@ void update_motion(void) {
     move_ball(dx, dy);
 }
 
+int setup_ticker(int n_msecs) {
+  struct itimerval new_timeset;
+  long n_sec, n_usecs;
+
+  n_sec = n_msecs / 1000;
+  n_usecs = (n_msecs % 1000) * 1000;
+
+  new_timeset.it_interval.tv_sec = n_sec;
+  new_timeset.it_interval.tv_usec = n_usecs;
+  new_timeset.it_value.tv_sec = n_sec;
+  new_timeset.it_value.tv_usec = n_usecs;
+  return setitimer(ITIMER_REAL, &new_timeset, NULL);
+}
+
+void on_tick(int sig) { tick = 1; }
+
 void init(void) {
   // init curse
   initscr();
   cbreak();
   noecho();
   clear();
-  curs_set(0);            // do not display cursor
-  leaveok(stdscr, TRUE);  // avoid cursor movement artifacts
-  nodelay(stdscr, TRUE);  // getch unblock
+  curs_set(0);           // do not display cursor
+  leaveok(stdscr, TRUE); // avoid cursor movement artifacts
+  nodelay(stdscr, TRUE); // getch unblock
 
   // signal init
   signal(SIGINT, SIG_IGN);
+  struct sigaction action = {0};
+  action.sa_handler = on_tick;
+  sigaction(SIGALRM, &action, NULL);
 
   // ball pos init
   ball.symbol = DFL_SYMBOL;
@@ -129,6 +143,10 @@ void init(void) {
   ball.y_pos = LINES / 2;
 
   move_ball(0, 0);
+  if (setup_ticker(MOVE_INTERVAL_MS)) {
+    perror("set ticker error");
+    exit(-1);
+  }
 }
 
 int main() {
@@ -138,9 +156,12 @@ int main() {
   struct epoll_event *monitor_events;
   int evtcnt;
   int ret = 0;
-  long last_move_ms;
+  sigset_t block_sigs;
+  sigset_t old_sigs;
+  sigemptyset(&block_sigs);
+  sigaddset(&block_sigs, SIGALRM);
 
-  devfd = open(EVENTDEV, O_RDONLY|O_NONBLOCK);
+  devfd = open(EVENTDEV, O_RDONLY | O_NONBLOCK);
   epfd = epoll_create(EPOLL_NUM);
 
   if (devfd == -1 || epfd == -1) {
@@ -159,21 +180,27 @@ int main() {
   epoll_ctl(epfd, EPOLL_CTL_ADD, devfd, &events);
 
   init();
-  last_move_ms = now_ms();
   while (done == 0) {
-    evtcnt = epoll_wait(epfd, monitor_events, EPOLL_NUM, EPOLL_WAIT_MS);
+    evtcnt = epoll_wait(epfd, monitor_events, EPOLL_NUM, -1);
     if (evtcnt == 1) {
       handle_key_event(monitor_events);
     } else if (evtcnt == -1) {
-      perror("epoll_wait error");
-      ret = -1;
-      break;
+      if (errno != EINTR) {
+        perror("epoll_wait error");
+        ret = -1;
+        break;
+      }
     }
 
-    if (now_ms() - last_move_ms >= MOVE_INTERVAL_MS) {
+    int ticktmp;
+    sigprocmask(SIG_BLOCK, &block_sigs, &old_sigs);
+    ticktmp = tick;
+    tick=0;
+    sigprocmask(SIG_SETMASK, &old_sigs, NULL);
+    if (ticktmp == 1) {
       update_motion();
-      last_move_ms = now_ms();
     }
+ 
   }
 
   endwin();
